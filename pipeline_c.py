@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from mosaic_bkg_sub import background_and_tiermask
 from pathlib import Path
 
-@dataclass
+@dataclass   
 class pipeline():
     '''
     JWST nircam image pipeline 
@@ -61,14 +61,13 @@ class pipeline():
         directory where store pipeline stage3's  mosaic's intermediate results.
         *mosaic_resample.fits
         *mosaic_bkg_sub.fis
-
     '''
     stage1_dir = "."
     stage2_dir = "."
     stage3_dir = "."
     mosaic_dir = "."
 
-    def stage1_wf(self, uncalfile , stage1_and_snowball = True, wisp = True, striping = True):
+    def stage1_wf(self, uncalfile , stage1_and_snowball = True, wisp = True, striping = True, mask_threshold = 0.8):
         '''
         Nircam image reduction stage1
         Do jwst Detector1Pipeline and some artifacts: (snowball, wisp and 1/f noise(striping pattern) correction.
@@ -103,6 +102,14 @@ class pipeline():
             os.rename(rampfit, rate)        
             os.rename(rampintsfit, rateints)
 
+            # change the fill_val from nan to 0.
+            with fits.open(rate) as hdul:
+                sci = hdul[1].data
+                sci[np.where(np.isnan(sci))] = 0
+                hdul["SCI"].data = sci
+                hdul.flush()
+
+
         #run wisp subtraction
         #⚠️调整WISPDIR: Why the wisp template version is 2 while jwst version and crds version is the latest?
         # Assuming wisp artifact only exsit in a3, a4 and b3, b4 detector at F150W and F200W band , so for most exposure don't execute this step.
@@ -114,11 +121,12 @@ class pipeline():
             wisp.fit_wisp_feature(ratefile, origfilename, fit_scaling = True)
 
         # #run 1overf noise subtraction
-        if striping:
-            stripfile = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset)
-            pre1f = stripfile.replace('rate.fits', 'rate_pre1f.fits')
-            striping = striping_noise(self.stage1_dir, self.stage1_dir)
-            striping.measure_striping(stripfile, pre1f, save_patterns = True)
+        if striping: 
+            stripfile = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset) 
+            pre1f = stripfile.replace('rate.fits', 'rate_pre1f.fits') 
+            striping = striping_noise(self.stage1_dir, self.stage1_dir, MASKTHRESH = mask_threshold) 
+            striping.measure_striping(stripfile, pre1f, save_patterns = True) 
+
 
     def stage2_ff(self,ratefile):
         '''
@@ -212,7 +220,7 @@ class pipeline():
         if input_dir == "None":
             input_dir = self.stage2_dir
         if asn_dir == "None":
-            asn_dir = self.stage3
+            asn_dir = self.mosaic_dir
     
         if update_wcs:
             #generate association file for tweakreg step.
@@ -260,7 +268,7 @@ class pipeline():
         Do mosaic creation (resample step) and final background subtraction.
         '''
 
-        fil = self.asn_creation(in_suffix = "match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir)
+        fil = self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir)
 
         if make_mosaic:
             json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic"))
