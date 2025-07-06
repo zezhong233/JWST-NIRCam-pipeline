@@ -6,8 +6,7 @@ os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
 from pipeline_c import pipeline
 from glob import glob
 
-
-stage1_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/stage1"
+stage1_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/remstriping_check/specify_threshold"
 stage2_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/stage2"
 stage3_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/stage3"
 mosaic_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/mosaic"
@@ -26,13 +25,21 @@ def run():
 #     ratefiles = sorted(glob("%s/*rate.fits"%stage1_dir)) 
 #     for ratefile in ratefiles: 
 #         pl.stage2_ff(ratefile) 
-#stage3_part1 
-    abs_refcat = "/mnt/data/CEERS/NIRCAM/align/0511_ref_cat/cat_ref_F200W.ecsv"
-    asn_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/ceers/asns"
-    pl.stage3_part1(asn_dir = asn_dir, abs_refcat = abs_refcat, update_wcs = True ,skymatch = True, outlier_detection = True, sky_wcs_var = True)
-#stage3_part2 
-    asn_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/asns"
-    pl.stage3_part2(asn_dir = asn_dir, make_mosaic = True, final_bkgsub = True) 
+# #stage3_part1 
+#     abs_refcat = "/mnt/data/CEERS/NIRCAM/align/0511_ref_cat/cat_ref_F200W.ecsv"
+#     asn_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/ceers/asns"
+#     pl.stage3_part1(asn_dir = asn_dir, abs_refcat = abs_refcat, update_wcs = True ,skymatch = True, outlier_detection = True, sky_wcs_var = True)
+# #stage3_part2 
+    # asn_dir = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/ceers/asns"
+    # pl.stage3_part2(asn_dir = asn_dir, make_mosaic = True, final_bkgsub = True) 
 
+# #test for remstriping.py
+
+    files = sorted(glob("/mnt/data/CEERS/NIRCAM/uncals/F115W/jw01345001001_02201_00001_*_uncal.fits"))
+    # threshold
+    thresholds = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.1, 0.0]
+    for file, threshold in zip(files, thresholds):
+        pl.stage1_wf(uncalfile = file, stage1_and_snowball = True, wisp = True, striping = True, mask_threshold = threshold)
+    
 if __name__ == "__main__": 
     run() 

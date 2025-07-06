@@ -71,14 +71,13 @@ NIR_amps = {'A': {'data': (4, 2044, 4, 512)},
             }
 
 class striping_noise():
-        
     #################################
     ### SET I/O AND OTHER SETUP HERE 
     def __init__(self, INPUTDIR, OUTPUTDIR, MASKTHRESH = 0.8):
         self.INPUTDIR = INPUTDIR
         self.OUTPUTDIR = OUTPUTDIR
         # Fraction of masked pixels in an amp-row that triggers switch to 
-        # full-row median
+        # full-row median 
         self.MASKTHRESH  = MASKTHRESH
         #################################
 
@@ -98,7 +97,6 @@ class striping_noise():
 
         return popt[1]
 
-
     def collapse_image(self, im, mask, dimension='y', sig=2.):
         """collapse an image along one dimension to check for striping.
 
@@ -109,15 +107,15 @@ class striping_noise():
         Striping is measured as a sigma-clipped median of all unmasked pixels 
         in the row or column.
 
-        Args:
-            im (float array): image data array
-            mask (bool array): image mask array, True where pixels should be 
-                masked from the fit (where DQ>0, source flux has been masked, etc.)
-            dimension (Optional [str]): specifies which dimension along which 
-                to collapse the image. If 'y', collapses along columns to 
+        Args: 
+            im (float array): image data array 
+            mask (bool array): image mask array, True where pixels should be  
+                masked from the fit (where DQ>0, source flux has been masked, etc.) 
+            dimension (Optional [str]): specifies which dimension along which  
+                to collapse the image. If 'y', collapses along columns to  
                 measure horizontal striping. If 'x', collapses along rows to 
-                measure vertical striping. Default is 'y'
-            sig (Optional [float]): sigma to use in sigma clipping
+                measure vertical striping. Default is 'y' 
+            sig (Optional [float]): sigma to use in sigma clipping 
         """
         # axis=1 results in array along y
         # axis=0 results in array along x
@@ -134,7 +132,6 @@ class striping_noise():
 
         return res[1]
         
-
     def masksources(self, image):
         """Detect sources in an image using a tiered approach for different 
         source sizes 
@@ -149,8 +146,8 @@ class striping_noise():
         dq = model.dq
 
         # bad pixel mask for make_source_mask
-        bpflag = dqflags.pixel['DO_NOT_USE']
-        bp = np.bitwise_and(dq, bpflag)
+        bpflag = dqflags.pixel['DO_NOT_USE'] #default 1
+        bp = np.bitwise_and(dq, bpflag) 
         bpmask = np.logical_not(bp == 0)
 
         log.info('masking, estimating background')
@@ -169,7 +166,7 @@ class striping_noise():
         log.info('masking, mask tier 1')
         # mask out sources iteratively
         # Try a reasonably big filter for masking the bright stuff
-        convolved_difference = convolve_fft(sci-filtered,Gaussian2DKernel(25))
+        convolved_difference = convolve_fft(sci-filtered, Gaussian2DKernel(25))
         mask1 = make_source_mask(convolved_difference, nsigma=3., npixels=15,
                                 mask=np.isnan(err))
         # grow the largest mask 
@@ -219,10 +216,10 @@ class striping_noise():
 
         Measures the horizontal & vertical striping present across the 
         full image. The full image median will be used for amp-rows that
-        are entirely or mostly masked out.
+        are entirely or mostly masked out. 
 
         Args:
-            fitdata (float array): image data array for fitting
+            fitdata (float array): image data array for fitting 
             mask (bool array): image mask array, True where pixels should be 
                 masked from the fit (where DQ>0, source flux has been masked, etc.)
 
@@ -397,7 +394,7 @@ class striping_noise():
         vstriping = self.collapse_image(temp_sub, mask, dimension='x')
         vertical_striping[:,:] = vstriping
 
-        # save horizontal and vertical patterns 
+        # save horizontal and vertical patterns                    
         if save_patterns:
             fits.writeto(outputbase.replace('.fits', '_horiz.fits'), 
                         horizontal_striping, overwrite=True)
