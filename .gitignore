@@ -1,1 +1,11 @@
-pipeline/ceers/asns/
+/asns/
+
+**/__pycache__/
+
+/str.ipynb
+
+/test.py
+
+
+
+
