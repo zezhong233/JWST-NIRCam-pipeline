@@ -1,7 +1,3 @@
-__author__ = "Micaela B. Bagley, UT Austin"
-__version__ = "0.2.0"
-__license__ = "BSD3"
-
 # Version history
 # 0.2.0 -- Adding option to provide a manual scaling factor instead of 
 #          fitting for scaling factor. This becomes useful to override the 
@@ -15,6 +11,7 @@ import os
 os.environ['CRDS_PATH']='/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/CRDS'  ## specify a PATH to save JWST reference file, more than 20GiB needed
 os.environ['CRDS_SERVER_URL']='https://jwst-crds.stsci.edu' ## download JWST reference file
 os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
+
 import shutil
 import argparse
 import logging
@@ -43,7 +40,7 @@ import crds
 # Pipeline 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
-WISPDIR = "/mnt/data/CEERS/NIRCAM/ceers-nircam/wisps_2022_08_26"
+WISPDIR = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/jwst/wisp_template_ver3"
 
 class wispsub():
 
@@ -215,9 +212,11 @@ class wispsub():
         model = ImageModel(os.path.join(self.INPUTDIR,image))
         filt = model.meta.instrument.filter
         detector = model.meta.instrument.detector
+        pupil = model.meta.instrument.pupil
+
         if (filt not in ['F150W','F200W']) | (detector not in detectors):
             log.info('No correction for %s %s (%s)'%(filt,detector,image))
-            return   ###!!!!!!
+            return   ###
 
         # check that image has not already been corrected
         for entry in model.history:
@@ -254,8 +253,7 @@ class wispsub():
                 model,applied_flat = do_correction(model, flat)
 
         # read in template and mask nans 
-        wisptemplate = os.path.join(WISPDIR,'wisps_%s_%s.fits'%(detector.lower(),
-                                                                filt.upper()))
+        wisptemplate = os.path.join(WISPDIR,'WISP_%s_%s_%s.fits'%(detector,filt,pupil))
         wisptemp = fits.getdata(wisptemplate)
         wisptemp[np.isnan(wisptemp)] = 0
         wisptemp[model.data == 0] = 0
