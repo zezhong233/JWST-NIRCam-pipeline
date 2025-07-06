@@ -104,7 +104,7 @@ class pipeline():
             os.rename(rampintsfit, rateints)
 
             # change the fill_val from nan to 0.
-            with fits.open(rate, mode = "update") as hdul:
+            with fits.open(rate, mode = "update") as hdul:   #update is important! 
                 sci = hdul[1].data
                 sci[np.where(np.isnan(sci))] = 0
                 hdul["SCI"].data = sci
