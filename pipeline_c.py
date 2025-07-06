@@ -3,6 +3,7 @@ os.environ['CRDS_PATH']='/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_di
 os.environ['CRDS_SERVER_URL']='https://jwst-crds.stsci.edu' ## download JWST reference file
 os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
 import sys
+import numpy as np
 from glob import glob
 from astropy.io import fits
 from snowball_run_pipeline import detector1_with_snowball_correction
