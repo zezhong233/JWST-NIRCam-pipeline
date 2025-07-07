@@ -252,7 +252,21 @@ class pipeline():
             for crf in crfs: 
                 p = Path(crf) 
                 p.rename(p.with_name(p.stem.replace("skymatch_a3001_crf", "_a3001_crf") + p.suffix)) 
- 
+            crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))
+            
+            for crf in crfs:
+                with fits.open(crf, mode = "update") as hdul:
+                    sci = hdul[1].data
+                    err = hdul[2].data
+                    r_noise = hdul[6].data
+                    sci[np.where(np.isnan(sci))] = 0
+                    err[np.where(np.isnan(err))] = 0
+                    r_noise[np.where(np.isnan(r_noise))] = 0
+                    hdul["SCI"].data = sci
+                    hdul["ERR"].data = err
+                    hdul["VAR_RNOISE"].data = r_noise
+                    hdul.flush()
+
         #correct for the variance map(for 0 value in bad area which don't contribute varicance) and sky_match(for small overlapping area)
         if sky_wcs_var:
             crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))  
@@ -272,14 +286,16 @@ class pipeline():
         fil = self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir)
 
         if make_mosaic:
+
             json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic"))
             mosaic = ResampleStep.call(json_m, crpix = [26678.5,-724.5], crval = [214.825,52.825],rotation = -49.7,
                                     output_dir = self.mosaic_dir, save_results = True, 
                                     pixfrac =1.0, pixel_scale = 0.03,output_shape = [10600,4800],
-                                    fillval = "NAN")
+                                    weight_type= "ivm")
+            
         #get nircam_{filter}_mosaic_resample.fits file 
 
         if final_bkgsub:
             resample = "{0}/nircam_{1}_mosaic_resample.fits".format(self.mosaic_dir, fil)
-            suffix = "bkg_sub"
+            suffix = "bkg_sub" 
             background_and_tiermask(resample, suffix, resample.split("/nircam")[0], self.mosaic_dir)
