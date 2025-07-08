@@ -193,6 +193,7 @@ class SubtractBackground:
         '''
         print(f"ring-filtered background median: {np.median(img)}")
         current_mask = bitmask != 0 
+
         for tiernum in range(len(self.tier_nsigma)):
             mask = self.tier_mask(img, current_mask, tiernum=tiernum)
             current_mask = np.logical_or(current_mask, mask)

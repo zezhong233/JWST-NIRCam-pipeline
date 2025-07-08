@@ -15,7 +15,7 @@ from jwst.resample.resample_step import ResampleStep
 from jwst.tweakreg.tweakreg_step import TweakRegStep
 from jwst.outlier_detection.outlier_detection_step import OutlierDetectionStep
 from jwst.skymatch.skymatch_step import SkyMatchStep
-from skywcsvar import sky_wcs_var_class 
+from skywcsvar import sky_wcs_var_class        
 from jwst.associations.asn_from_list import asn_from_list
 from collections import defaultdict
 from dataclasses import dataclass
@@ -137,7 +137,6 @@ class pipeline():
         input: *rate.fits
         output: *_cal.fits 
         '''
-      
         Image2Pipeline.call(ratefile,output_dir = self.stage2_dir ,steps = {'bkg_subtract':{'skip':False}, 'resample':{'skip':True}}) 
 
 
@@ -256,18 +255,13 @@ class pipeline():
             
             for crf in crfs:
                 with fits.open(crf, mode = "update") as hdul:
-                    sci = hdul[1].data
-                    err = hdul[2].data
                     r_noise = hdul[6].data
-                    sci[np.where(np.isnan(sci))] = 0
-                    err[np.where(np.isnan(err))] = 0
                     r_noise[np.where(np.isnan(r_noise))] = 0
-                    hdul["SCI"].data = sci
-                    hdul["ERR"].data = err
                     hdul["VAR_RNOISE"].data = r_noise
                     hdul.flush()
 
-        #correct for the variance map(for 0 value in bad area which don't contribute varicance) and sky_match(for small overlapping area)
+        #correct for the variance map(for 0 value in bad area which don't contribute varicance, so set value in this area in inf)
+        #  and sky_match(for small overlapping area, minus a pedestal value.)
         if sky_wcs_var:
             crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))  
             for crf in crfs:
@@ -275,10 +269,14 @@ class pipeline():
                 swv.INPUTDIR = self.stage3_dir
                 swv.OUTPUTDIR = self.stage3_dir
                 swv.MASKDIR = self.stage1_dir
-                swv.process(os.path.basename(crf))
+                swv.process(os.path.basename(crf))    
             #By default, get _a3001_match.fits, which is ready to do mosaic. and _a3001_bkgsub_1.fits.
 
-    def stage3_part2(self, asn_dir = "None", make_mosaic = True, final_bkgsub = True):
+    def stage3_part2(self, crpix = "null", crval = "null", rotation = 0, 
+                        pixfrac = 1.0,pixel_scale = 0.03, 
+                        asn_dir = ".", 
+                        weight_type = "ivm", 
+                        make_mosaic = True, final_bkgsub = True):
         '''
         Do mosaic creation (resample step) and final background subtraction.
         '''
@@ -288,10 +286,10 @@ class pipeline():
         if make_mosaic:
 
             json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic"))
-            mosaic = ResampleStep.call(json_m, crpix = [26678.5,-724.5], crval = [214.825,52.825],rotation = -49.7,
+            mosaic = ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation,
                                     output_dir = self.mosaic_dir, save_results = True, 
-                                    pixfrac =1.0, pixel_scale = 0.03,output_shape = [10600,4800],
-                                    weight_type= "ivm")
+                                    pixfrac = pixfrac, pixel_scale = pixel_scale, 
+                                    weight_type= weight_type)
             
         #get nircam_{filter}_mosaic_resample.fits file 
 
