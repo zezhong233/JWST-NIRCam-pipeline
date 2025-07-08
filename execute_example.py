@@ -32,7 +32,6 @@ def run():
     abs_refcat = "GAIADR3"
     asn_dir = "./asn" #your asn files directory
     pl.stage3_part1(asn_dir = asn_dir, abs_refcat = abs_refcat, update_wcs = True ,skymatch =  True, outlier_detection = True, sky_wcs_var = True)
-    #需要做skymatch吗？
 
 #stage3_part2 
     asn_dir = "./asn"
