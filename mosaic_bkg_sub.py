@@ -10,7 +10,7 @@ from astropy.io import fits
 import background_subtraction
 import os 
 
-
+ 
 def background_and_tiermask(image, bkg_suffix, inputdir, outputpath):
     #subtract the background using a single four-tier mask
     cfg = ConfigParser()

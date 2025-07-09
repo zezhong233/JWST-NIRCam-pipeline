@@ -110,7 +110,7 @@ class pipeline():
                 hdul["SCI"].data = sci
                 hdul.flush()
 
-
+ 
         #run wisp subtraction
         #⚠️调整WISPDIR: Why the wisp template version is 2 while jwst version and crds version is the latest?
         # Assuming wisp artifact only exsit in a3, a4 and b3, b4 detector at F150W and F200W band , so for most exposure don't execute this step.

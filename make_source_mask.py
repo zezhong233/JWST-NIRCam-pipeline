@@ -5,7 +5,7 @@ from astropy.convolution import Gaussian2DKernel, convolve
 
 import numpy as np
 
-
+ 
 def make_source_mask(data, nsigma, npixels, mask=None, filter_fwhm=None,
                      filter_size=3, kernel=None, sigclip_sigma=3.0,
                      sigclip_iters=5, dilate_size=11):
@@ -14,7 +14,7 @@ def make_source_mask(data, nsigma, npixels, mask=None, filter_fwhm=None,
     sigma_clip = SigmaClip(sigma=sigclip_sigma, maxiters=sigclip_iters)
     threshold = detect_threshold(data, nsigma, background=None, error=None,
                                  mask=mask, sigma_clip=sigma_clip)
-
+ 
     if kernel is None and filter_fwhm is not None:
         kernel_sigma = filter_fwhm * gaussian_fwhm_to_sigma
         kernel = Gaussian2DKernel(kernel_sigma, x_size=filter_size,
