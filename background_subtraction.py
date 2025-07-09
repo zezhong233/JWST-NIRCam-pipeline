@@ -149,10 +149,10 @@ class SubtractBackground:
         # Apply a floating ceiling to the original image
         ceiling = self.ring_clip_max_sigma * background_rms + bkg.background
         # Pixels above the ceiling are masked before doing the ring-median filtering
-        ceiling_mask = sci > ceiling
+        ceiling_mask = sci > ceiling 
         print(f"Ring median filtering with radius, width = ",end='')
         print(f"{self.ring_radius_in}, {self.ring_width}")
-        sci_filled = self.replace_masked(sci,         mask | ceiling_mask) # | 代表有一个是True就是True，这句话的意思是把mask和ceiling_mask mask 掉的地方用平均值代替
+        sci_filled = self.replace_masked(sci, mask | ceiling_mask) # | 代表有一个是True就是True，这句话的意思是把mask和ceiling_mask mask 掉的地方用平均值代替
         ring = Ring2DKernel(self.ring_radius_in, self.ring_width)
         filtered = median_filter(sci_filled, footprint=ring.array)  
         return sci-filtered 
@@ -165,20 +165,26 @@ class SubtractBackground:
         convolved_difference = convolve_fft(replaced_img,Gaussian2DKernel(self.tier_kernel_size[tiernum]),allow_huge=True)
         # First detect the sources, then make masks from the SegmentationImage
         seg_detect = detect_sources(convolved_difference, 
-                    threshold=self.tier_nsigma[tiernum] * background_rms,
+                    threshold=self.tier_nsigma[tiernum] * background_rms, #in do_background_subtraction function, it will subtract the ring median filtered background, and the bkg_level is approxmately 0.
                     npixels=self.tier_npixels[tiernum], 
                      mask=mask)
         if self.tier_dilate_size[tiernum] == 0:
-            mask = seg_detect.make_source_mask()
+            if seg_detect is None:
+                return mask
+            else:
+                mask = seg_detect.make_source_mask()
         else:
             footprint = circular_footprint(radius=self.tier_dilate_size[tiernum])
-            mask = seg_detect.make_source_mask(footprint = footprint)
+            if seg_detect is None:
+                return mask
+            else:
+                mask = seg_detect.make_source_mask(footprint = footprint)
         print(f"Tier #{tiernum}:")
         print(f"  kernel_size = {self.tier_kernel_size[tiernum]}")
         print(f"  tier_nsigma = {self.tier_nsigma[tiernum]}")
         print(f"  tier_npixels = {self.tier_npixels[tiernum]}")
         print(f"  tier_dilate_size = {self.tier_dilate_size[tiernum]}")
-        print(f"  median of ring-median-filtered image = {np.median(img)}")
+        print(f"  median of ring-median-filtered image = {np.nanmedian(img)}")
         print(f"  biweight rms of ring-median-filtered image  = {background_rms}")
         # For debugging #####################################################################
         # dill.dump(convolved_difference,open(f"convolved_difference{tiernum}.pkl","wb"))
@@ -191,9 +197,8 @@ class SubtractBackground:
         ''' Iteratively mask sources 
             Wtarting_bit lets you add bits for these masks to an existing bitmask
         '''
-        print(f"ring-filtered background median: {np.median(img)}")
+        print(f"ring-filtered background median: {np.nanmedian(img)}")
         current_mask = bitmask != 0 
-
         for tiernum in range(len(self.tier_nsigma)):
             mask = self.tier_mask(img, current_mask, tiernum=tiernum)
             current_mask = np.logical_or(current_mask, mask)
@@ -266,7 +271,8 @@ class SubtractBackground:
         # Ring-median filter 
         #filtered = self.ring_median_filter(sci, mask)
         filtered = self.clipped_ring_median_filter(sci, mask) #filter 是去掉背景之后的data
-        
+        print("ring filtered image's bkg is:", astrostats.biweight_location(filtered, ignore_nan = True))
+
         # Mask sources iteratively in tiers
         bitmask = self.mask_sources(filtered, bitmask, starting_bit=1)
         mask = (bitmask != 0) 

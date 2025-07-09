@@ -265,11 +265,16 @@ class pipeline():
         if sky_wcs_var:
             crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))  
             for crf in crfs:
-                swv = sky_wcs_var_class()
-                swv.INPUTDIR = self.stage3_dir
-                swv.OUTPUTDIR = self.stage3_dir
-                swv.MASKDIR = self.stage1_dir
-                swv.process(os.path.basename(crf))    
+                match_file = crf.replace("crf.fits", "match.fits")
+                if os.path.exists(match_file):
+                    print(f"The sky_wcs_var step has been implied for {os.path.basename(crf)}, so skip it.")
+                    continue
+                else:
+                    swv = sky_wcs_var_class()
+                    swv.INPUTDIR = self.stage3_dir
+                    swv.OUTPUTDIR = self.stage3_dir
+                    swv.MASKDIR = self.stage1_dir
+                    swv.process(os.path.basename(crf))    
             #By default, get _a3001_match.fits, which is ready to do mosaic. and _a3001_bkgsub_1.fits.
 
     def stage3_part2(self, crpix = "null", crval = "null", rotation = 0, 

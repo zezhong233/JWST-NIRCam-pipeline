@@ -2,8 +2,6 @@
 #2025.06.20
 #Zhangzhongyi 
 #Follow Ceers' method to do another bkgsub for doc's pipeline to check if result is basicly same.
-#The result is promising!
-#Result is save in /home/zezhong/work/JWST_data_reduction/9.bkg_sub/output /drizzle_F***W_bkg_sub.fits
 ### ###########
 
 
