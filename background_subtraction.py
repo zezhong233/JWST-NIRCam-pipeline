@@ -307,7 +307,7 @@ class SubtractBackground:
         if self.replace_sci:
             hdu['SCI'].data = bkgd_subtracted
         # Append 
-        else:
+        else: 
             newhdu = fits.ImageHDU(bkgd_subtracted,header=wcs.to_header(),name='BKGSUB')
             hdu.append(newhdu)   
         # Append an extension with the bitmask from the tiers of source rejection

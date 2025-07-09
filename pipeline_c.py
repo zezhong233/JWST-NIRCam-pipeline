@@ -114,7 +114,7 @@ class pipeline():
         #run wisp subtraction
         #⚠️调整WISPDIR: Why the wisp template version is 2 while jwst version and crds version is the latest?
         # Assuming wisp artifact only exsit in a3, a4 and b3, b4 detector at F150W and F200W band , so for most exposure don't execute this step.
-        # It will judge automatically.
+        # It will judge automatically. 
         if wisp:
             ratefile = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset)
             origfilename = ratefile.replace(".fits","_prewisp.fits") ##原本rate.rate_prewisp.fits
