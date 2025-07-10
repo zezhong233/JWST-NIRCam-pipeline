@@ -46,6 +46,6 @@ def run():
     pix_scale = 0.02 #adjust 
     pl.stage3_part2(asn_dir = asn_dir, crpix = crpix, crval = crval, pix_frac = pix_frac, pix_scale = pix_scale) 
 
-
+ 
 if __name__ == "__main__": 
     run() 
