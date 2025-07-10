@@ -7,6 +7,7 @@ from pipeline_c import pipeline
 from glob import glob
 from astropy.io import fits
 
+stage0_dir = "your stage0 directory"
 stage1_dir = "your stage1 directory"
 stage2_dir = "your stage2 directory"
 stage3_dir = "your stage3 directory"
@@ -14,6 +15,7 @@ mosaic_dir = "your mosaic directory"
 
 def run():
     pl = pipeline()
+    pl.stage0_dir = stage0_dir
     pl.stage1_dir = stage1_dir
     pl.stage2_dir = stage2_dir
     pl.stage3_dir = stage3_dir
