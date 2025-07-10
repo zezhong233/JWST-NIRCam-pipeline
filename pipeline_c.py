@@ -4,6 +4,7 @@ os.environ['CRDS_SERVER_URL']='https://jwst-crds.stsci.edu' ## download JWST ref
 os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
 import sys
 import numpy as np
+import math
 from glob import glob
 from astropy.io import fits
 from snowball_run_pipeline import detector1_with_snowball_correction
@@ -63,6 +64,7 @@ class pipeline():
         *mosaic_resample.fits
         *mosaic_bkg_sub.fis
     '''
+    stage0_dir = "."
     stage1_dir = "."
     stage2_dir = "."
     stage3_dir = "."
@@ -112,7 +114,7 @@ class pipeline():
 
  
         #run wisp subtraction
-        #⚠️调整WISPDIR: Why the wisp template version is 2 while jwst version and crds version is the latest?
+        #Using wisp_template in version 3.
         # Assuming wisp artifact only exsit in a3, a4 and b3, b4 detector at F150W and F200W band , so for most exposure don't execute this step.
         # It will judge automatically. 
         if wisp:
@@ -140,7 +142,7 @@ class pipeline():
         Image2Pipeline.call(ratefile,output_dir = self.stage2_dir ,steps = {'bkg_subtract':{'skip':False}, 'resample':{'skip':True}}) 
 
 
-    def asn_creation(self,in_suffix, out_suffix , input_dir = "None", output_dir = "None", type:{"single","multiple"} = "single"):
+    def asn_creation(self,in_suffix, out_suffix , input_dir = "None", output_dir = "None", type:{"single","multiple"} = "single", multi_angles = False):
         '''
         Auxiliary function to generate association file in asdf syntax.
         -----------------------------------------------------------------
@@ -168,14 +170,29 @@ class pipeline():
             files = sorted(glob("{0}/*{1}.fits".format(input_dir, in_suffix)))
             with fits.open(files[0]) as hdul:
                 fil = hdul[0].header["FILTER"]
-            lists = files
-            match_asn = asn_from_list(lists, product_name = "nircam_%s"%fil)
-            json = "{0}/nircam_{1}_{2}.json".format(output_dir, fil, out_suffix)
 
-            with open(json, 'w') as jsonfile:
-                name, serialized = match_asn.dump(format = "json")
-                jsonfile.write(serialized)  
-            return fil
+            if multi_angles:
+                position_angle = defaultdict(list)
+                for file in files:
+                    with fits.open(file) as hdul:
+                        hea = hdul[1].header
+                        PA_V3 = f"{hea["PA_V3"]:.1f}"
+                    position_angle[PA_V3].append(file)
+                for angle in position_angle.keys():
+                    match_asn = asn_from_list(position_angle[angle], product_name = "nircam_{0}_{1}_{2}".format(fil, output_dir,angle))
+                    json = "{0}/nircam_{1}_{2}_{3}.json".format(output_dir, fil, out_suffix,angle)
+                    with open(json, "w") as jsonfile:
+                        name, serialized = match_asn.dump(format = "json")
+                        jsonfile.write(serialized)
+                return fil, position_angle
+            else:
+                lists = files
+                match_asn = asn_from_list(lists, product_name = "nircam_%s"%fil)
+                json = "{0}/nircam_{1}_{2}.json".format(output_dir, fil, out_suffix)
+                with open(json, 'w') as jsonfile:
+                    name, serialized = match_asn.dump(format = "json")
+                    jsonfile.write(serialized)  
+                return fil
 
         if type == "multiple":
             files = sorted(glob("{0}/*{1}.fits".format(input_dir, in_suffix)))
@@ -216,6 +233,7 @@ class pipeline():
             whether to run this step. 
             Only for test, all true by default.
         '''
+
         #If input_dir or asn_dir is "None", use default address.
         if input_dir == "None":
             input_dir = self.stage2_dir
@@ -277,28 +295,39 @@ class pipeline():
                     swv.process(os.path.basename(crf))    
             #By default, get _a3001_match.fits, which is ready to do mosaic. and _a3001_bkgsub_1.fits.
 
-    def stage3_part2(self, crpix = "null", crval = "null", rotation = 0, 
-                        pixfrac = 1.0,pixel_scale = 0.03, 
-                        asn_dir = ".", 
-                        weight_type = "ivm", 
-                        make_mosaic = True, final_bkgsub = True):
+    def cal_rotation(self, h):
+        pcs = np.array([[ h['PC1_1'],  h['PC1_2']], [h['PC2_1'], h['PC2_2']]])
+        cd = np.array([[h['CDELT1'], 0],[0, h['CDELT2']]])
+        cd_rot=np.dot(pcs,cd)
+        w1 = cd_rot[0,0]
+        w2 = cd_rot[1,0]
+        rotation = math.atan(-w2/w1)/math.pi*180
+        return rotation
+
+    def stage3_part2(self, crpix:list = None, crval:list = None, rotation:float = None,
+                        pixfrac:float= None, pixel_scale:float = None, outputshape:list = None, 
+                        asn_dir:str = ".",
+                        weight_type:str = "ivm"):
         '''
         Do mosaic creation (resample step) and final background subtraction.
         '''
+        fil, ang_fit_dic= self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir, multi_angles=True)
 
-        fil = self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir)
-
-        if make_mosaic:
-
-            json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic"))
-            mosaic = ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation,
+        for angle in list(ang_fit_dic.keys()):
+            json_m = os.path.join(asn_dir, "nircam_{}_{}_{}.json".format(fil, "mosaic", angle))
+            match_fits = ang_fit_dic[angle][0]
+            base = os.path.basename(match_fits)
+            base = os.path.join(self.stage0_dir, base)
+            uncal = base.replace("a3001_match.fits", "uncal.fits")
+            header = fits.getheader(uncal, 1)
+            if rotation is None:
+                rotation = self.cal_rotation(header)
+            # json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic")) 
+            mosaic = ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation, #rotation will be ignored if pixel_scale is given, and it will adopt default value.
                                     output_dir = self.mosaic_dir, save_results = True, 
-                                    pixfrac = pixfrac, pixel_scale = pixel_scale, 
+                                    pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape, 
                                     weight_type= weight_type)
-            
-        #get nircam_{filter}_mosaic_resample.fits file 
-
-        if final_bkgsub:
-            resample = "{0}/nircam_{1}_mosaic_resample.fits".format(self.mosaic_dir, fil)
+    #get nircam_{filter}_mosaic_resample.fits file 
+            resample = "{0}/nircam_{1}_mosaic_{2}_resample.fits".format(self.mosaic_dir, fil, angle)
             suffix = "bkg_sub" 
             background_and_tiermask(resample, suffix, resample.split("/nircam")[0], self.mosaic_dir)

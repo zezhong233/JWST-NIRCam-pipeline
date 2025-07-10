@@ -317,3 +317,4 @@ class SubtractBackground:
         hdu.writeto(outpath,overwrite=True)
         print(f"Writing out {outpath}")
         print("")
+ 

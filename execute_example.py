@@ -5,6 +5,7 @@ os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
 
 from pipeline_c import pipeline
 from glob import glob
+from astropy.io import fits
 
 stage1_dir = "your stage1 directory"
 stage2_dir = "your stage2 directory"
@@ -35,7 +36,13 @@ def run():
 
 #stage3_part2 
     asn_dir = "./asn"
-    pl.stage3_part2(asn_dir = asn_dir, make_mosaic = True, final_bkgsub = True) 
+    ref_fits = "./*mosaic.fits"
+    header = fits.getheader(ref_fits, 0)
+    crpix = [header["CRPIX1"] - 1,header["CRPIX2"] - 1] 
+    crval = [header["CRVAL1"], header["CRVAL2"]]
+    pix_frac = header["PIXFRAC"]
+    pix_scale = 0.02 #adjust 
+    pl.stage3_part2(asn_dir = asn_dir, crpix = crpix, crval = crval, pix_frac = pix_frac, pix_scale = pix_scale) 
 
 
 if __name__ == "__main__": 
