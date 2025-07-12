@@ -81,12 +81,9 @@ class pipeline():
             address of a uncal.fits to be processed. 
             like: /mnt/data/CEERS/NIRCAM/uncals/jw01345001001_02201_00001_nrca1_uncal.fits
             not a directory, so for multiple images, please loop the dir when cite this function.
-        stage1_and_snowball: boolean
+        stage1_and_snowball, wisp: boolean, striping: boolean 
             whether to run this step.
-        wisp: boolean
-            whether to run this step.
-        striping: boolean 
-            whether to run this step.
+            default all True, only for test.
         '''
         uncalbase = os.path.basename(uncalfile)
         dataset = uncalbase.split("_uncal.fits")[0] #file's basic name
@@ -296,6 +293,7 @@ class pipeline():
             #By default, get _a3001_match.fits, which is ready to do mosaic. and _a3001_bkgsub_1.fits.
 
     def cal_rotation(self, h):
+        
         pcs = np.array([[ h['PC1_1'],  h['PC1_2']], [h['PC2_1'], h['PC2_2']]])
         cd = np.array([[h['CDELT1'], 0],[0, h['CDELT2']]])
         cd_rot=np.dot(pcs,cd)
