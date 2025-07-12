@@ -7,6 +7,7 @@ from pipeline_c import pipeline
 from glob import glob
 from astropy.io import fits
 
+filter = "090" #example
 stage0_dir = "your stage0 directory"
 stage1_dir = "your stage1 directory"
 stage2_dir = "your stage2 directory"
@@ -43,7 +44,10 @@ def run():
     crpix = [header["CRPIX1"] - 1,header["CRPIX2"] - 1] 
     crval = [header["CRVAL1"], header["CRVAL2"]]
     pix_frac = header["PIXFRAC"]
-    pix_scale = 0.02 #adjust 
+    if filter in ["090", "115", "150", "200"]:#SW
+        pix_scale = 0.02
+    else:#LW, ["277", "356", "410", "444"]
+        pix_scale = 0.04
     pl.stage3_part2(asn_dir = asn_dir, crpix = crpix, crval = crval, pix_frac = pix_frac, pix_scale = pix_scale) 
 
  
