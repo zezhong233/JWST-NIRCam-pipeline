@@ -40,7 +40,7 @@ import crds
 # Pipeline 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
-WISPDIR = "/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/jwst/wisp_template_ver3"
+WISPDIR = "/home/zezhong/work/ImageReduction_Pipeline/CRDS/wisp_template_ver3"
 
 class wispsub():
 

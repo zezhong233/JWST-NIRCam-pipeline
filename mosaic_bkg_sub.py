@@ -14,7 +14,7 @@ import os
 def background_and_tiermask(image, bkg_suffix, inputdir, outputpath):
     #subtract the background using a single four-tier mask
     cfg = ConfigParser()
-    cfg.read("/home/zezhong/work/Final_ImageReduction_Pipeline/pipeline/jwst/mosaic_background.cfg")
+    cfg.read("/home/zezhong/work/ImageReduction_Pipeline/pipelines/nircam_ceers_pipeline/mosaic_background.cfg")
     options = cfg.options("nircam")
     parameters = {}
     # get the paramters

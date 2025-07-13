@@ -1,5 +1,5 @@
 import os
-os.environ['CRDS_PATH']='/home/zezhong/work/Final_ImageReduction_Pipeline/Sci_dir/CRDS'  ## specify a PATH to save JWST reference file, more than 20GiB needed
+os.environ['CRDS_PATH']='/home/zezhong/work/ImageReduction_Pipeline/CRDS'  ## specify a PATH to save JWST reference file, more than 20GiB needed
 os.environ['CRDS_SERVER_URL']='https://jwst-crds.stsci.edu' ## download JWST reference file
 os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
 import sys
