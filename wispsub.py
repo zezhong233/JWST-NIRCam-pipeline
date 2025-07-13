@@ -10,7 +10,7 @@
 import os
 os.environ['CRDS_PATH']='/home/zezhong/work/ImageReduction_Pipeline/CRDS'  ## specify a PATH to save JWST reference file, more than 20GiB needed
 os.environ['CRDS_SERVER_URL']='https://jwst-crds.stsci.edu' ## download JWST reference file
-os.environ["CRDS_CONTEXT"] = "jwst_1364.pmap"
+os.environ["d_CONTEXT"] = "jwst_1364.pmap"
 
 import shutil
 import argparse
@@ -41,7 +41,7 @@ import crds
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 WISPDIR = "/home/zezhong/work/ImageReduction_Pipeline/CRDS/wisp_template_ver3"
-
+0
 class wispsub():
 
     def __init__(self,INPUTDIR, OUTPUTDIR):
