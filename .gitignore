@@ -6,6 +6,8 @@
 
 /test.py
 
+/pipeline_c.py 
+
 /execute.py
 
 /fits_files/
@@ -14,7 +16,7 @@
 
 /test/
 
-/pipeline_c.py 
+
 
 
 
