@@ -41,7 +41,6 @@ import crds
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 WISPDIR = "/home/zezhong/work/ImageReduction_Pipeline/CRDS/wisp_template_ver3"
-0
 class wispsub():
 
     def __init__(self,INPUTDIR, OUTPUTDIR):
@@ -89,7 +88,7 @@ class wispsub():
         err = data.err
         wcsinfo = data.meta.wcsinfo
         err[np.isnan(err)] = 1.e5  #用err来识别不用的的coverage 
-        im = np.asarray(im)
+        im = np.asarray(im) 
 
         # make a source mask
         log.info('creating source mask')
@@ -207,14 +206,14 @@ class wispsub():
             crds_context = crds.get_default_context()
 
         # only need to do wisp subtraction for subset of filters and detectors
-        detectors = ['NRCA3','NRCA4','NRCB3','NRCB4']
+        detectors = ['NRCA3','NRCA4','NRCB3','NRCB4']           
 
         model = ImageModel(os.path.join(self.INPUTDIR,image))
         filt = model.meta.instrument.filter
         detector = model.meta.instrument.detector
         pupil = model.meta.instrument.pupil
 
-        if (filt not in ['F150W','F200W']) | (detector not in detectors):
+        if (filt not in ['F150W','F200W',"F090W", "F115W"]) | (detector not in detectors):
             log.info('No correction for %s %s (%s)'%(filt,detector,image))
             return   ###
 
