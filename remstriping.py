@@ -295,7 +295,7 @@ class striping_noise():
         log.info('Working on %s'%os.path.basename(image))
 
         # apply the flat to get a cleaner meausurement of the striping
-        if apply_flat:
+        if apply_flat: #if do stripping after stage2, then no needs to do flat field again, So set False.
             log.info('Applying flat for cleaner measurement of striping patterns')
             # pull flat from CRDS using the current context
             crds_dict = {'INSTRUME':'NIRCAM', 
@@ -446,29 +446,3 @@ class striping_noise():
             immodel.history.append(substr)
             log.info('Saving cleaned image to %s'%outputbase)
             immodel.save(outputbase)
-
-
-    def main(self):
-
-        parser = argparse.ArgumentParser(description='Measure and remove horizontal and vertical striping pattern (1/f noise) from rate file')
-        parser.add_argument('image', type=str,
-                            help='Filename of rate image for pattern subtraction')
-
-        parser.add_argument('--thresh', type=float, 
-                            help='The threshold (fraction of masked pixels in an amp-row) above which to switch to a full-row median')
-        parser.add_argument('--save_patterns', action='store_true',
-                            help='Save the horizontal and vertical striping patterns as FITS files')
-        args = parser.parse_args()
-        image = os.path.join(self.INPUTDIR, args.image)
-
-        # Original rate will be copied to INPUTDIR with suffix pre1f
-        pre1f = image.replace('rate.fits', 'rate_pre1f.fits')
-
-        self.measure_striping(image, pre1f, thresh=args.thresh, apply_flat=True, 
-                        mask_sources=True, save_patterns=args.save_patterns)
-
-
-    if __name__ == '__main__':
-        main()
-
-        
