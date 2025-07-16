@@ -148,7 +148,7 @@ class sky_wcs_var_class():
         # read in segmentation map created during 1/f correction
         # image3_part1.asdf adds the association id a3001 to the filename
         segmap = os.path.join(self.MASKDIR, 
-                    cal.replace('_a3001_%s.fits'%self.FILE_SUFFIX,'_rate_1fmask.fits'))
+                    cal.replace('_a3001_%s.fits'%self.FILE_SUFFIX,'_cal_1fmask.fits'))
         seg = fits.getdata(segmap)
         w = np.where((dq == 0) & (seg == 0))
         data = sci[w]
