@@ -73,7 +73,7 @@ NIR_amps = {'A': {'data': (4, 2044, 4, 512)},
 class striping_noise():
     #################################
     ### SET I/O AND OTHER SETUP HERE 
-    def __init__(self, INPUTDIR, OUTPUTDIR, MASKTHRESH = 0.8):
+    def __init__(self, INPUTDIR, OUTPUTDIR, MASKTHRESH = 0):
         self.INPUTDIR = INPUTDIR
         self.OUTPUTDIR = OUTPUTDIR
         # Fraction of masked pixels in an amp-row that triggers switch to 
@@ -174,7 +174,7 @@ class striping_noise():
         temp[mask1] = 1
         sources = np.logical_not(temp == 0)
         dilation_sigma = 10
-        dilation_window = 11
+        dilation_window = 20
         dilation_kernel = Gaussian2DKernel(dilation_sigma, x_size=dilation_window,
                                         y_size=dilation_window)
 

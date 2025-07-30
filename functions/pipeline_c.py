@@ -8,8 +8,7 @@ import math
 from glob import glob
 from astropy.io import fits
 from snowball_run_pipeline import detector1_with_snowball_correction
-# from wispsub import wispsub
-from subtract_wisp import wisp_class
+from wispsub import wispsub
 from remstriping import striping_noise 
 from jwst.pipeline import Image2Pipeline
 from jwst.pipeline import Image3Pipeline 
@@ -24,87 +23,120 @@ from dataclasses import dataclass
 from mosaic_bkg_sub import background_and_tiermask
 from pathlib import Path
 
-'''
-Find a new wisp subtraction algorithm, looks better.
-But needs to change the structure of pipeline, which puts the wisp and 1overf noise into stage2.
-And an optional choise is using  LW image, which isn't affected by wisp noise, to do source detection.
-Besides, given the speed of stage1, I choose 
--------------------------------------------------------------------------------------------------------
-Zhongyi Zhang 2025/07/15
-'''
-
-@dataclass
+@dataclass   
 class pipeline():
-    lw_dir:     str = "."
-    asn_dir:    str = "."
-    wisp_dir:   str = "."
-    stage0_dir: str = "."
-    stage1_dir: str = "."
-    stage2_dir: str = "."
-    stage3_dir: str = "."
-    mosaic_dir: str = "."
+    '''
+    JWST nircam image pipeline 
+    author: Zhongyi Zhang
+        - Almostly bases on Bagley's ceers nircam image reduction pipeline.
+        - elaborate discussion can be found here: https://doi.org/10.3847/2041-8213/acbb08
+    -----------------------------------------------------------------
+    Initial parameters:
+    ------------------------
+    stage1_dir: str
+        directory where store pipeline stage1's intermediate results.
+        *ramp.fits
+        *trapsfilled.fits
+        *rate_prewisp.fits(some)
+        *rate_segm_cold.fits(some)
+        *wisp.pdf(some)
+        *rateints.fits
+        *rate_pre1f.fits 
+        *rate_1fmask.fits
+        *rate_horiz.fits
+        *rate_vert.fits
+        *rate.fits
 
+    stage2_dir: str
+        directory where store pipeline stage2's intermediate results.
+        *cal.fits
 
-    def stage1(self, uncalfile):
-        
-        base_index = os.path.basename(uncalfile).split("_uncal.fits")[0]
+    stage3_dir: str
+        directory where store pipeline stage3's single exposure's intermediate results.
+        *tweakreg.fits
+        *skymatch.fits
+        *a3001_bkgsub.fits
+        *a3001_crf.fits
+        *a3001_match.fits
+
+    mosaic_dir: str
+        directory where store pipeline stage3's  mosaic's intermediate results.
+        *mosaic_resample.fits
+        *mosaic_bkg_sub.fis
+    '''
+    stage0_dir = "."
+    stage1_dir = "."
+    stage2_dir = "."
+    stage3_dir = "."
+    mosaic_dir = "."
+
+    def stage1_wf(self, uncalfile , stage1_and_snowball = True, wisp = True, striping = True, mask_threshold = 0.8):
+        '''
+        Nircam image reduction stage1
+        Do jwst Detector1Pipeline and some artifacts: (snowball, wisp and 1/f noise(striping pattern) correction.
+        ---------------------------------------------------
+        parameters:
+        ------------
+        uncalfile: str
+            address of a uncal.fits to be processed. 
+            like: /mnt/data/CEERS/NIRCAM/uncals/jw01345001001_02201_00001_nrca1_uncal.fits
+            not a directory, so for multiple images, please loop the dir when cite this function.
+        stage1_and_snowball, wisp: boolean, striping: boolean 
+            whether to run this step.
+            default all True, only for test.
+        '''
+        uncalbase = os.path.basename(uncalfile)
+        dataset = uncalbase.split("_uncal.fits")[0] #file's basic name
+        inputdir = uncalfile.split(uncalbase)[0] #Nonsence, just for syntax
         #run stage1 and snowball
-        detector1_with_snowball_correction(base_index, input_dir = self.stage0_dir, output_dir = self.stage1_dir, maxcores = "quarter")
-        #base_index_0_*.fits is rate file
-        #base_index_1_*.fits is rateints file
+        if stage1_and_snowball:
+            detector1_with_snowball_correction(dataset,inputdir,output_dir = self.stage1_dir, maxcores = "half")
+            #dataset_0_*.fits is rate file
+            #dataset_1_*.fits is rateints file
 
-        #change the name.
-        rampfit = os.path.join(self.stage1_dir, "%s_0_rampfitstep.fits"%base_index)
-        rampintsfit = os.path.join(self.stage1_dir, "%s_1_rampfitstep.fits"%base_index)
-        rate = os.path.join(self.stage1_dir, "%s_rate.fits"%base_index)
-        rateints = os.path.join(self.stage1_dir, "%s_rateints.fits"%base_index)
-        os.rename(rampfit, rate)        
-        os.rename(rampintsfit, rateints)
-        print("------------------------------------Finish jwst.Detector1Pipeline for {0}_uncal.fits--------------------------------------".format(base_index))
+            #change the name.
+            rampfit = os.path.join(self.stage1_dir, "%s_0_rampfitstep.fits"%dataset)
+            rampintsfit = os.path.join(self.stage1_dir, "%s_1_rampfitstep.fits"%dataset)
+            rate = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset)
+            rateints = os.path.join(self.stage1_dir, "%s_rateints.fits"%dataset)
+            os.rename(rampfit, rate)        
+            os.rename(rampintsfit, rateints)
+
+            # change the fill_val from nan to 0.
+            with fits.open(rate, mode = "update") as hdul:   #update is important! 
+                sci = hdul[1].data
+                sci[np.where(np.isnan(sci))] = 0
+                hdul["SCI"].data = sci
+                hdul.flush()
+
+ 
+        #run wisp subtraction
+        #Using wisp_template in version 3.
+        # Assuming wisp artifact only exsit in a3, a4 and b3, b4 detector at F150W and F200W band , so for most exposure don't execute this step.
+        # It will judge automatically. 
+        if wisp:
+            ratefile = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset)
+            origfilename = ratefile.replace(".fits","_prewisp.fits") ##原本rate.rate_prewisp.fits
+            wisp = wispsub(self.stage1_dir, self.stage1_dir)
+            wisp.fit_wisp_feature(ratefile, origfilename, fit_scaling = True)
+
+        # #run 1overf noise subtraction
+        if striping: 
+            stripfile = os.path.join(self.stage1_dir, "%s_rate.fits"%dataset) 
+            pre1f = stripfile.replace('rate.fits', 'rate_pre1f.fits') 
+            striping = striping_noise(self.stage1_dir, self.stage1_dir, MASKTHRESH = mask_threshold) 
+            striping.measure_striping(stripfile, pre1f, save_patterns = True) 
 
 
-
-    def stage2(self, ratefile, stage2_pipeline = True, wisp = True, one_over_noise = True):
-
+    def stage2_ff(self,ratefile):
         '''
-        ratefile: str
-            relative path to *rate.fits, e.g. jw01324001001_02201_00001_nrca3_rate.fits
+        Do jwst Image2Pipeline in default configuration.    
+        Correction to WCS, flat_fielding, flux calibration, etc
+        ---------------------------------------------------
+        input: *rate.fits
+        output: *_cal.fits 
         '''
-
-        base_index = os.path.basename(ratefile).split("_rate.fits")[0]
-        calfile = os.path.join(self.stage2_dir, base_index + "_cal.fits") #absolute filepath 
-        # print(calfile)
-        if stage2_pipeline:
-            print("start executing stage2")
-            Image2Pipeline.call(ratefile,output_dir = self.stage2_dir ,steps = {'bkg_subtract':{'skip':False}, 'resample':{'skip':True}}) 
-            print("------------------------------------Finish jwst.Image2Pipeline for {0}_rate.fits--------------------------------------".format(base_index))
-
-
-        with fits.open(calfile, mode = "update") as hdul:
-            sci = hdul["SCI"].data
-            sci[np.where(np.isnan(sci))] = 0
-            hdul["SCI"].data = sci
-            hdul.flush()
-
-        if wisp:#will do wisp subtraction 
-            sw = wisp_class()
-            sw.wisp_dir = self.wisp_dir
-            sw.lw_dir = self.lw_dir
-            sw.process_file(f = calfile, seg_from_lw = False, save_segmap = False)
-            print("------------------------------------Finish wisp_subtraction for {0}_cal.fits--------------------------------------".format(base_index))
-            #output: *cal.fits
-            #origin: *cal_prewisp.fits
-
-        if one_over_noise:
-            stripfile = calfile
-            pre1f = stripfile.replace('cal.fits', 'cal_pre1f.fits')  
-            striping = striping_noise(self.stage2_dir, self.stage2_dir) 
-            striping.measure_striping(stripfile, pre1f, save_patterns = False, apply_flat=False) #don't do flat field. 
-            #don't save horizonal and vertical pattern 
-            print("------------------------------------Finish 1/f stripping pattern subtraction for {0}_cal.fits--------------------------------------".format(base_index))
-
-
-
+        Image2Pipeline.call(ratefile,output_dir = self.stage2_dir ,steps = {'bkg_subtract':{'skip':False}, 'resample':{'skip':True}}) 
 
 
     def asn_creation(self,in_suffix, out_suffix , input_dir = "None", output_dir = "None", type:{"single","multiple"} = "single", multi_angles = False):
@@ -203,13 +235,13 @@ class pipeline():
         if input_dir == "None":
             input_dir = self.stage2_dir
         if asn_dir == "None":
-            asn_dir = self.asn_dir
+            asn_dir = self.mosaic_dir
     
         if update_wcs:
             #generate association file for tweakreg step.
             fil = self.asn_creation(in_suffix = "cal", out_suffix = "tweakreg",input_dir=input_dir, output_dir=asn_dir)
             json_t = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "tweakreg"))
-            #run jwst tweakreg step 
+
             TweakRegStep.call(json_t, use_custom_catalogs = use_custom_catalogs,catfile = rel_catfile,  catalog_format = "ecsv",
                                         brightest = 400, npixels = 20, contrast = 0.005, nclip = 5, sigma = 3, 
                                         abs_refcat = abs_refcat, abs_fitgeometry = "general", save_results = True, 
@@ -217,28 +249,25 @@ class pipeline():
                                     )
         #do sky_match(temporarily can't subtract the bkg) and outlier detection 
         if skymatch:
-            #generate association file for skymatch step.
+            
             fil = self.asn_creation(in_suffix = "tweakreg", out_suffix = "sky_match", output_dir=asn_dir)
             json_s = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "sky_match"))
-            #run jwst skymatch step
             SkyMatchStep.call(json_s,output_dir = self.stage3_dir, suffix = "skymatch", save_results = True, skymethod = "local", 
                               output_use_index = False, output_use_model = True)
-            
         if outlier_detection:
-            #generate association file for skymatch step.
+
             fil = self.asn_creation(in_suffix = "skymatch", out_suffix = "outlier", output_dir=asn_dir)
             json_o = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "outlier"))
-            #run jwst jwst outlierDetection
             OutlierDetectionStep.call(json_o, output_dir = self.stage3_dir, suffix = "crf",save_results = True,
                                        output_use_index = False, output_use_model = True)
 
-            #rename the output file, for simpleness. 
+            #rename the output file 
             crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))   
             for crf in crfs: 
                 p = Path(crf) 
                 p.rename(p.with_name(p.stem.replace("skymatch_a3001_crf", "_a3001_crf") + p.suffix)) 
             crfs = sorted(glob("{0}/*_crf.fits".format(self.stage3_dir)))
-
+            
             for crf in crfs:
                 with fits.open(crf, mode = "update") as hdul:
                     r_noise = hdul[6].data
@@ -259,7 +288,7 @@ class pipeline():
                     swv = sky_wcs_var_class()
                     swv.INPUTDIR = self.stage3_dir
                     swv.OUTPUTDIR = self.stage3_dir
-                    swv.MASKDIR = self.stage2_dir
+                    swv.MASKDIR = self.stage1_dir
                     swv.process(os.path.basename(crf))    
             #By default, get _a3001_match.fits, which is ready to do mosaic. and _a3001_bkgsub_1.fits.
 
@@ -273,50 +302,31 @@ class pipeline():
         rotation = math.atan(-w2/w1)/math.pi*180
         return rotation
 
-
-
-
     def stage3_part2(self, crpix:list = None, crval:list = None, rotation:float = None,
                         pixfrac:float= None, pixel_scale:float = None, outputshape:list = None, 
                         asn_dir:str = ".",
                         weight_type:str = "ivm",
-                        multi_angles = False):
+                        multi_angles = True):
         '''
         Do mosaic creation (resample step) and final background subtraction.
         '''
+        fil, ang_fit_dic= self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir, multi_angles=multi_angles)
 
-        if multi_angles:    
-            fil, ang_fit_dic= self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir, multi_angles=True)
-            for angle in list(ang_fit_dic.keys()):
-
-                json_m = os.path.join(asn_dir, "nircam_{}_{}_{}.json".format(fil, "mosaic", angle))
-                mosaic = ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation, #rotation will be ignored if pixel_scale is given, and it will adopt default value.
-                                        output_dir = self.mosaic_dir, save_results = True, 
-                                        pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape, 
-                                        weight_type= weight_type)
-                resample = "{0}/nircam_{1}_mosaic_{2}_resample.fits".format(self.mosaic_dir, fil, angle)
-                suffix = "bkg_sub" 
-                background_and_tiermask(resample, suffix, resample.split("/nircam")[0], self.mosaic_dir)
-
-        else:
-
-            fil = self.asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = asn_dir, multi_angles = False)
-            json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic"))
+        for angle in list(ang_fit_dic.keys()):
+            json_m = os.path.join(asn_dir, "nircam_{}_{}_{}.json".format(fil, "mosaic", angle))
+            match_fits = ang_fit_dic[angle][0]
+            base = os.path.basename(match_fits)
+            base = os.path.join(self.stage0_dir, base)
+            uncal = base.replace("a3001_match.fits", "uncal.fits")
+            header = fits.getheader(uncal, 1)
+            if rotation is None:
+                rotation = self.cal_rotation(header)
+            # json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic")) 
             mosaic = ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation, #rotation will be ignored if pixel_scale is given, and it will adopt default value.
-                        output_dir = self.mosaic_dir, save_results = True, 
-                        pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape, 
-                        weight_type= weight_type)
-            
-            resample = "{0}/nircam_{1}_mosaic_resample.fits".format(self.mosaic_dir, fil)
+                                    output_dir = self.mosaic_dir, save_results = True, 
+                                    pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape, 
+                                    weight_type= weight_type)
+    #get nircam_{filter}_mosaic_resample.fits file 
+            resample = "{0}/nircam_{1}_mosaic_{2}_resample.fits".format(self.mosaic_dir, fil, angle)
             suffix = "bkg_sub" 
             background_and_tiermask(resample, suffix, resample.split("/nircam")[0], self.mosaic_dir)
-
-
-            # match_fits = ang_fit_dic[angle][0]
-            # base = os.path.basename(match_fits)
-            # base = os.path.join(self.stage0_dir, base)
-            # uncal = base.replace("a3001_match.fits", "uncal.fits")
-            # header = fits.getheader(uncal, 1)
-            # if rotation is None:
-            #     rotation = self.cal_rotation(header)
-            # json_m = os.path.join(asn_dir, "nircam_{0}_{1}.json".format(fil, "mosaic")) 

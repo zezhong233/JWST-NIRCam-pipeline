@@ -2,11 +2,12 @@ from pipeline_new import pipeline
 from concurrent.futures import ProcessPoolExecutor
 from glob import glob
 from datetime import datetime 
+from astropy.io import fits
 import os
 from math import floor
 
 filter = "200"
-ID = "1324"
+ID = "2561"
 wisp_dir = "/home/zezhong/work/ImageReduction_Pipeline/CRDS/wisp_template_ver3"
 sci_dir = f"/mnt/data/UNCOVER_grism/Project/JWST_NIRCam_{ID}/F{filter}W"
 stage0_dir = os.path.join(sci_dir, "uncal")
@@ -17,13 +18,15 @@ mosaic_dir = os.path.join(sci_dir, "mosaic_new")
 asn_dir = os.path.join(sci_dir, "asn_new")
 lw_dir = os.path.join(sci_dir,"lw_new")#optional 
 
+mosaic = f"/mnt/data/UNCOVER_grism/UNCOVER_DR3/UNCOVER_NIRCam_F{filter}W_bkgsub_sci.fits"
+
 def run_stage1(args):
     '''
     args: 二元元组    
     '''
     cfg, uncalfile = args
     pl = pipeline(**cfg)
-    pl.stage1(uncalfile = uncalfile, )
+    pl.stage1(uncalfile = uncalfile)
     return f"{uncalfile}, Done."
 
 
@@ -42,11 +45,18 @@ def run_stage3(cfg):
 
 def run_resample(cfg):
     pl = pipeline(**cfg)
+    
+    #pix_scale
     if filter in ["090", "115","150","200"]:
         pixel_scale = 0.02
     else:
         pixel_scale = 0.04
-    pl.stage3_part2(pixfrac = 1.0, pixel_scale = pixel_scale, multi_angles = False)
+
+    #pixfrac
+    header = fits.getheader(mosaic)
+    pix_frac = header["PIXFRAC"]
+
+    pl.stage3_part2(pixfrac = pix_frac, pixel_scale = pixel_scale, multi_angles = False)
 
 
 def main(stage1, stage2, stage3, resample):
@@ -104,6 +114,4 @@ def main(stage1, stage2, stage3, resample):
 
 
 if __name__ == "__main__":
-    main(stage1 = False, stage2 = False, stage3 = True, resample = True) 
-
-
+    main(stage1 = False, stage2 = False, stage3 = False, resample = True) 

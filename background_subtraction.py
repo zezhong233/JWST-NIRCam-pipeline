@@ -16,6 +16,7 @@ __license__ = "BSD3"
 # 1.4.0 -- Added clipped_ring_median to try to have the ring-median have less suppression in the outskirts of galaxies
 
 import numpy as np
+import gc 
 from astropy.io import fits
 from astropy import stats as astrostats
 from os import path
@@ -78,7 +79,7 @@ class SubtractBackground:
                         self.dq = h.data
                         print(f"{fitsfile} has a DQ array")
         return sci,err
-    
+
     # Convenience routine for inspecting the background and mask
     def plot_mask(self, scene, bkgd, mask, zmin, zmax, smooth=0, slices=None):
         '''Make a three-panel plot of:
@@ -110,13 +111,13 @@ class SubtractBackground:
         plt.subplot(133)
         plt.imshow(_scene-_bkgd, vmin=zmin, vmax=zmax,origin='lower')
         plt.contour(_mask, colors='red', alpha=0.2)
-    
+
     def replace_masked(self, sci, mask):
         sci_nan = np.choose(mask,(sci,np.nan)) #没有mask的地方用sci，mask掉的地方用nan代替，因为nan不会参与到biweight_location的计算中
         robust_mean_background = astrostats.biweight_location(sci_nan,c=6.,ignore_nan=True)
         sci_filled = np.choose(mask,(sci,robust_mean_background))# mask掉的地方用robust_mean_bkg代替，没有被mask掉的地方用sci
         return sci_filled
-    
+
     def off_detector(self, sci, err):
         return np.isnan(err) # True if OFF detector, False if on detector
 
@@ -125,16 +126,9 @@ class SubtractBackground:
         for flag_name in self.dq_flags_to_mask:
             flagbit = dqflags.pixel[flag_name]
             self.dqmask = self.dqmask | (np.bitwise_and(self.dq,flagbit) != 0)
-    
-    def ring_median_filter(self, sci, mask):
-        print(f"Ring median filtering with radius, width = ",end='')
-        print(f"{self.ring_radius_in}, {self.ring_width}")
-        sci_filled = self.replace_masked(sci,mask)
-        ring = Ring2DKernel(self.ring_radius_in, self.ring_width)
-        filtered = median_filter(sci, footprint=ring.array)
-        return sci-filtered
 
     def clipped_ring_median_filter(self, sci, mask):
+        print("Start ring median filter.")
         # First make a smooth background (clip_box_size should be big)
         bkg = Background2D(sci,
               box_size = self.ring_clip_box_size,
@@ -144,6 +138,7 @@ class SubtractBackground:
               exclude_percentile = 90,
               mask = mask,
               interpolator = BkgZoomInterpolator())
+        print("bkg estimation finished.")
         # Estimate the rms after subtracting this
         background_rms = astrostats.biweight_scale((sci-bkg.background)[~mask]) 
         # Apply a floating ceiling to the original image
@@ -154,20 +149,30 @@ class SubtractBackground:
         print(f"{self.ring_radius_in}, {self.ring_width}")
         sci_filled = self.replace_masked(sci, mask | ceiling_mask) # | 代表有一个是True就是True，这句话的意思是把mask和ceiling_mask mask 掉的地方用平均值代替
         ring = Ring2DKernel(self.ring_radius_in, self.ring_width)
-        filtered = median_filter(sci_filled, footprint=ring.array)  
-        return sci-filtered 
-   
+        filtered = median_filter(sci_filled, footprint=ring.array) 
+        print("ring median filter finished.")
+
+        del ceiling_mask
+        del sci_filled 
+        gc.collect()
+
+        return sci-filtered
+
     def tier_mask(self, img, mask, tiernum = 0):
         background_rms = astrostats.biweight_scale(img[~mask]) # Already has been ring-median subtracted
         # Replace the masked pixels by the robust background level so the convolution doesn't smear them
         background_level = astrostats.biweight_location(img[~mask]) # Already has been ring-median subtracted
         replaced_img = np.choose(mask,(img,background_level))
+        print("replaces_img generated")
         convolved_difference = convolve_fft(replaced_img,Gaussian2DKernel(self.tier_kernel_size[tiernum]),allow_huge=True)
+        print("FFT convolution finished.")
+
         # First detect the sources, then make masks from the SegmentationImage
         seg_detect = detect_sources(convolved_difference, 
                     threshold=self.tier_nsigma[tiernum] * background_rms, #in do_background_subtraction function, it will subtract the ring median filtered background, and the bkg_level is approxmately 0.
                     npixels=self.tier_npixels[tiernum], 
                      mask=mask)
+        print("source_detection finished.")
         if self.tier_dilate_size[tiernum] == 0:
             if seg_detect is None:
                 return mask
@@ -176,34 +181,25 @@ class SubtractBackground:
         else:
             footprint = circular_footprint(radius=self.tier_dilate_size[tiernum])
             if seg_detect is None:
+                print("这一轮啥也没有。")
                 return mask
             else:
                 mask = seg_detect.make_source_mask(footprint = footprint)
         print(f"Tier #{tiernum}:")
-        print(f"  kernel_size = {self.tier_kernel_size[tiernum]}")
-        print(f"  tier_nsigma = {self.tier_nsigma[tiernum]}")
-        print(f"  tier_npixels = {self.tier_npixels[tiernum]}")
-        print(f"  tier_dilate_size = {self.tier_dilate_size[tiernum]}")
-        print(f"  median of ring-median-filtered image = {np.nanmedian(img)}")
-        print(f"  biweight rms of ring-median-filtered image  = {background_rms}")
-        # For debugging #####################################################################
-        # dill.dump(convolved_difference,open(f"convolved_difference{tiernum}.pkl","wb"))
-        # dill.dump(img,open(f"bkgsub_img{tiernum}.pkl","wb"))
-        # dill.dump(mask,open(f"bkgsub_masktier{tiernum}.pkl","wb"))
-        #####################################################################################
+
         return mask
 
-    def mask_sources(self, img, bitmask, starting_bit=1): 
+    def mask_sources(self, img, mask): 
         ''' Iteratively mask sources 
             Wtarting_bit lets you add bits for these masks to an existing bitmask
         '''
         print(f"ring-filtered background median: {np.nanmedian(img)}")
-        current_mask = bitmask != 0 
+
         for tiernum in range(len(self.tier_nsigma)):
-            mask = self.tier_mask(img, current_mask, tiernum=tiernum)
-            current_mask = np.logical_or(current_mask, mask)
-            bitmask = np.bitwise_or(bitmask,np.left_shift(mask,tiernum+starting_bit))
-        return bitmask
+            current_mask = self.tier_mask(img, mask, tiernum=tiernum)
+            mask = np.logical_or(current_mask, mask)
+            
+        return mask
     
     def estimate_background(self, img, mask):
         bkg = Background2D(img, 
@@ -226,39 +222,21 @@ class SubtractBackground:
                     mask = mask,
                     interpolator = BkgIDWInterpolator())
         return bkg
-
-    def evaluate_bias(self, bkgd, err, mask):
-        on_detector = np.logical_not(np.isnan(err)) # True if on detector, False if not
-    
-        mean_masked = bkgd[mask & on_detector].mean()
-        std_masked = bkgd[mask & on_detector].std()
-        stderr_masked = mean_masked/(np.sqrt(len(bkgd[mask]))*std_masked)
-    
-        mean_unmasked = bkgd[~mask & on_detector].mean()
-        std_unmasked = bkgd[~mask & on_detector].std()
-        stderr_unmasked = mean_unmasked/(np.sqrt(len(bkgd[~mask]))*std_unmasked)
-        
-        diff = mean_masked - mean_unmasked
-        significance = diff/np.sqrt(stderr_masked**2 + stderr_unmasked**2)
-        
-        print(f"Mean under masked pixels   = {mean_masked:.4f} +- {stderr_masked:.4f}")
-        print(f"Mean under unmasked pixels = "
-              f"{mean_unmasked:.4f} +- {stderr_unmasked:.4f}")
-        print(f"Difference = {diff:.4f} at {significance:.2f} sigma significance")
-    
     # Customize the parameters for the different steps here 
     def do_background_subtraction(self, datadir, fitsfile,  outputpath):
         # Background subtract all the bands
         print(fitsfile)
         sci, err = self.open_file(datadir,fitsfile)
-
+        print("读取出了sci和err")
         # Set up a bitmask
-        bitmask = np.zeros(sci.shape,np.uint32) # Enough for 32 tiers
+        # bitmask = np.zeros(sci.shape,np.uint32) # Enough for 32 tiers
+        mask = np.zeros(sci.shape, bool)
+        print("设置空mask")
 
         # First level is for masking pixels off the detector
         off_detector_mask = self.off_detector(sci,err)#把不在探测器上的像素mask掉
         #bitmask = np.bitwise_or(bitmask,np.left_shift(off_detector_mask,0))
-        
+        print("off detector 的像素被mask掉")
         # Mask by DQ bits if desired and DQ file exists
         if self.has_dq:
             self.mask_by_dq()
@@ -266,16 +244,23 @@ class SubtractBackground:
         else:
             mask = off_detector_mask 
 
-        bitmask = np.bitwise_or(bitmask,np.left_shift(mask,0))    
+
+        del off_detector_mask
+        gc.collect()
+        # bitmask = np.bitwise_or(bitmask,np.left_shift(mask,0))    
 
         # Ring-median filter 
-        #filtered = self.ring_median_filter(sci, mask)
         filtered = self.clipped_ring_median_filter(sci, mask) #filter 是去掉背景之后的data
-        print("ring filtered image's bkg is:", astrostats.biweight_location(filtered, ignore_nan = True))
+
+        print(f"Finished the ring_median_filter for {fitsfile}")
 
         # Mask sources iteratively in tiers
-        bitmask = self.mask_sources(filtered, bitmask, starting_bit=1)
-        mask = (bitmask != 0) 
+        print("开始tier mask")
+        mask = self.mask_sources(filtered, mask)
+        print("结束tier mask")
+
+        del filtered
+        gc.collect()
 
         # Estimate the background using just unmasked regions
         if self.interpolator == 'IDW':
@@ -287,15 +272,6 @@ class SubtractBackground:
         # Subtract the background
         bkgd_subtracted = sci-bkgd
 
-        # Evaluate
-        print("Bias under bright sources:")
-        self.evaluate_bias(bkgd,err,mask) # Under all the sources
-        print("\nBias under fainter sources")
-        faintmask = np.zeros(sci.shape,bool)
-        for t in self.faint_tiers_for_evaluation:
-            faintmask = faintmask | (np.bitwise_and(bitmask,2**t) != 0)
-        self.evaluate_bias(bkgd,err,faintmask) # Just under the fainter sources
-        
         # Write out the results
         prefix = fitsfile[:fitsfile.rfind('_')] #   找到最后一个_之前的所有字符
         outfile = f"{prefix}_{self.suffix}.fits"
@@ -311,7 +287,9 @@ class SubtractBackground:
             newhdu = fits.ImageHDU(bkgd_subtracted,header=wcs.to_header(),name='BKGSUB')
             hdu.append(newhdu)   
         # Append an extension with the bitmask from the tiers of source rejection
-        newhdu = fits.ImageHDU(bitmask,header=wcs.to_header(),name='TIERMASK')
+        # newhdu = fits.ImageHDU(bitmask,header=wcs.to_header(),name='TIERMASK')
+        mask = mask.astype(np.uint8)
+        newhdu = fits.ImageHDU(mask, header = wcs.to_header(), name = "MASK")
         hdu.append(newhdu)
         # Write out the new FITS file
         hdu.writeto(outpath,overwrite=True)

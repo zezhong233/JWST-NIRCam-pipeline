@@ -39,10 +39,9 @@ def background_and_tiermask(image, bkg_suffix, inputdir, outputpath):
 
 
 if __name__ == "__main__":
-    mosaic_dir = "/mnt/data/UNCOVER_grism/Project/JWST_NITCam_1324/F090W/mosaic"
-    angles = [43.2, 251.3]
-    fil = "F090W"
-    for angle in angles:
-        resample = "{0}/nircam_{1}_mosaic_{2}_resample.fits".format(mosaic_dir, fil, angle)
-        suffix = "bkg_sub" 
-        background_and_tiermask(resample, suffix, resample.split("/nircam")[0], mosaic_dir)
+    mosaic_dir = "/mnt/data/UNCOVER_grism/Project/1324_2561_F200W/mosaic"
+    fil = "F200W"
+
+    resample = "{0}/nircam_{1}_mosaic_resample.fits".format(mosaic_dir, fil)
+    suffix = "bkg_sub" 
+    background_and_tiermask(resample, suffix, resample.split("/nircam")[0], mosaic_dir)
