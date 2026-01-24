@@ -27,11 +27,6 @@ from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor
 
-
-
-
-
-
 def asn_creation(in_suffix, out_suffix , input_dir, output_dir, files = None, multi_angles = False):
     '''
     Auxiliary function to generate association file in asdf syntax.
@@ -128,7 +123,6 @@ class pipeline():
             #run stage1 and snowball
             print("--Start to execute jwst Detector1pipeline and snowball flag for {0}.--".format(uncalfile))
             detector1_with_snowball_correction(base_index, input_dir = self.stage0_dir, output_dir = self.stage1_dir, maxcores = "quarter")
-            # detector1_with_snowball_correction(base_index, input_dir = self.stage0_dir, output_dir = self.stage1_dir, maxcores = 8)
 
             #base_index_0_*.fits is rate file
             #base_index_1_*.fits is rateints file
@@ -138,9 +132,8 @@ class pipeline():
             print("--Finish jwst.Detector1Pipeline for {0}_uncal.fits.--".format(base_index))
 
         #fill nan place to 0, seems stripping step needs it.
-
-
         if stripping:
+            
             with fits.open(rate, mode = "update") as hdul:#update is important.
                 sci = hdul["SCI"].data
                 sci[np.where(np.isnan(sci))] = 0
@@ -162,7 +155,7 @@ class pipeline():
                 sci = hdul["SCI"].data
                 sci[sci == 0] = np.nan
                 hdul["SCI"].data = sci
-                hdul.flush()
+                hdul.flush()        
 
 
     def stage2(self, ratefile, stage2 = True, wisp = True):
@@ -299,7 +292,7 @@ class pipeline():
                 ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation, #rotation will be ignored if pixel_scale is given, and it will adopt default value.
                                         output_dir = self.mosaic_dir, save_results = True, 
                                         pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape,  #outputshape x,y最好都是某一个数的倍数
-                                        weight_type= weight_type, in_memory = True)
+                                        weight_type= weight_type, in_memory = False)
 
         else:
             fil = asn_creation(in_suffix = "a3001_match", out_suffix = "mosaic", input_dir = self.stage3_dir,output_dir = self.asn_dir, multi_angles = False)
@@ -307,7 +300,7 @@ class pipeline():
             ResampleStep.call(json_m, crpix = crpix, crval = crval,rotation = rotation, #rotation will be ignored if pixel_scale is given, and it will adopt default value.
                         output_dir = self.mosaic_dir, save_results = True, 
                         pixfrac = pixfrac, pixel_scale = pixel_scale, output_shape = outputshape, 
-                        weight_type= weight_type, in_memory = True)
+                        weight_type= weight_type, in_memory = False)
 
     def bkgsub(self,factor, data_dir = None, fitsfile = None, outputpath = None, merged_mask_path = None):
         
@@ -334,17 +327,17 @@ if __name__ == "__main__":
     import os
     os.chdir("/RS2423/JWST/BLAGN_legacy/CEERS_PID_1345_NIRCam/")
     print("hello")
-    bands = ["115W", "150W","200W", "277W","356W", "410M", "444W"]
-    # bands = ["277W"]
-    POINTING_ID = 4
+    bands = ["150W", "410M"]
+    POINTING_ID = 9
     start = datetime.now()
     print(f"start at {start}")
 
     n_cpu = os.cpu_count()
+    n_worker = min(len(bands), int(n_cpu/2))
     futures = []
+    print(f"there are {n_worker} core is used.")
 
-
-    with ProcessPoolExecutor(max_workers = int(n_cpu/2)) as executor:
+    with ProcessPoolExecutor(max_workers = n_worker) as executor:
         for band in bands:
             data_dir = f"Pointing_{POINTING_ID}/F{band}/resample/"
             fitsfile = f"nircam_F{band}_mosaic_resample.fits"
@@ -356,8 +349,9 @@ if __name__ == "__main__":
                 factor = 0.03/0.04
             future = executor.submit(run_merge_bkgsub, factor, data_dir, fitsfile, output_path, merged_mask)
             futures.append(future)
-    for f in futures.results():
-        print(f)
+
+    for f in futures:
+        print(f.result())
 
     end = datetime.now()
     print(f"end at {end}")

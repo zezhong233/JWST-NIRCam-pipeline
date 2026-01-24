@@ -324,24 +324,28 @@ class striping_noise():
                 
         # construct mask for median calculation
         mask = np.zeros(model.data.shape, dtype=bool)
-        mask[model.dq > 0] = True
-        
+        mask[model.dq > 4] = True
+        # mask |= (model.data == 0)
+        # mask |= np.isnan(model.data)
+        log.info("double mask")
         # mask out sources convolve
         if mask_sources:
             
             # first look for a source mask in OUTPUTDIR that already exists
             srcmask = outputbase.replace('.fits', '_1fmask.fits')
             if os.path.exists(srcmask):
+                print(f"detected ready-made mask :{srcmask}")
                 log.info('Using existing source mask %s'%srcmask)
                 seg = fits.getdata(srcmask)
-                print(f"识别到了之前的mask:{srcmask}")
+
             else:
+                print("No previous mask is detected.")
                 log.info('Detecting sources to mask out source flux')
                 seg = self.masksources(image)
-                print("没有检测到")
             
             wobj = np.where(seg > 0)
             mask[wobj] = True
+            
 
         # measure the pedestal in the unmasked parts of the image
         log.info('Measuring the pedestal in the image')

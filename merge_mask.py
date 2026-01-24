@@ -80,14 +80,15 @@ def merge_mask(mask_paths,  in_band, header = None, save = True, parent_dir = No
 
 if __name__ == "__main__":
 
-    POINTING_ID = 4
+    POINTING_ID = 10
 
     paths = get_files(f"Pointing_{POINTING_ID}/F*/resample/bkgsub.fits")
 
     # masks, wcss = get_masks(paths)
 
-    bands = ["115W", "150W", "200W", "277W", "356W", "410M", "444W"]
-    assert len(bands) == len(paths), "shape isn't same."
+    bands = ["277W", "356W", "410M", "444W"] 
+    # bands = ["115W", "150W", "200W","277W", "356W", "410M", "444W"]
+    # assert len(bands) == len(paths), "shape isn't same."
 
     parent_dir = f"Pointing_{POINTING_ID}/M_DATA"
 
@@ -95,22 +96,21 @@ if __name__ == "__main__":
         os.makedirs(parent_dir, exist_ok=True)
 
 
-    all_futures = []
-    with ProcessPoolExecutor(max_workers=max(1, int(cpu_count / 2))) as executor:
-        for tar_ID in [2,3,4,5,6]:
-        # for tar_ID in [0,1]:
-            for i in range(len(bands)):
-                f = executor.submit(reproject_mask,
-                                    paths,i, tar_ID, parent_dir)
-                all_futures.append(f)
+    # all_futures = []
+    # with ProcessPoolExecutor(max_workers=7) as executor:
+    #     for tar_ID in [3,4,5,6]:
+    #         for i in range(len(bands)):
+    #             f = executor.submit(reproject_mask,
+    #                                 paths,i, tar_ID, parent_dir)
+    #             all_futures.append(f)
 
-    for f in all_futures:
-        f.result()
+    # for f in all_futures:
+    #     f.result()
 
 
     merge_futures = []
 
-    with ProcessPoolExecutor(max_workers=max(1, int(cpu_count / 2))) as executor_2:
+    with ProcessPoolExecutor(max_workers=7) as executor_2:
 
         for in_band in bands:
             print("hahaha")

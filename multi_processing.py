@@ -80,13 +80,17 @@ def process_band(cfg, stage1 = False, stage2 = False, stage3 = False, sky_var = 
     print(f"--- Starting processing for filter: {cfg['filter']} ---")
 
     n_maxworker = os.cpu_count() 
+    workers = 8
     if stage1:
         start = datetime.now()
         files_stage1 = sorted(glob(os.path.join(cfg["stage0_dir"], "*uncal.fits")))
-        print("stage1 files' length is:", len(files_stage1))
+        n_files_uncal = len(files_stage1)
+        print("stage1 files' length is:", n_files_uncal)
         tasks_stage1 = [(cfg, f) for f in files_stage1]
-        
-        with ProcessPoolExecutor(max_workers=floor(n_maxworker / 2)) as pool:
+        n_cpu_used = floor(n_maxworker / 2)
+        # workers = min(n_files_uncal, n_cpu_used)
+
+        with ProcessPoolExecutor(max_workers=workers) as pool:
             for res in pool.map(run_stage1, tasks_stage1):
                 print(res)
         end = datetime.now()
@@ -96,7 +100,7 @@ def process_band(cfg, stage1 = False, stage2 = False, stage3 = False, sky_var = 
         files_stage2 = sorted(glob(os.path.join(cfg["stage1_dir"], "*rate.fits")))
         tasks_stage2 = [(cfg, f) for f in files_stage2]
         start = datetime.now()
-        with ProcessPoolExecutor(max_workers=floor(n_maxworker/2)) as pool:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
             for res in pool.map(run_stage2, tasks_stage2):
                 print(res)
         end = datetime.now()    # 100files - 20min 
@@ -112,7 +116,7 @@ def process_band(cfg, stage1 = False, stage2 = False, stage3 = False, sky_var = 
         start = datetime.now()
         files_crfs = sorted(glob(os.path.join(cfg["stage3_dir"], "*a3001_crf.fits")))
         tasks = [(cfg, f) for f in files_crfs]
-        with ProcessPoolExecutor(max_workers = floor(n_maxworker/2)) as pool:
+        with ProcessPoolExecutor(max_workers = workers) as pool:
             for res in pool.map(run_sky_var, tasks):
                 print(res)
         end = datetime.now()
@@ -137,11 +141,9 @@ def process_band(cfg, stage1 = False, stage2 = False, stage3 = False, sky_var = 
 
 if __name__ == "__main__":
 
-    pointing = "7"
-    filters = ["356W", "410M", "444W"]
+    pointing = "9"
+    filters = ["444W"]
     # filters = ["150W"]
-
-
 
     wisp_dir = "/home/zhongyi/CRDS/wisp_template_ver3"
     for filter in filters:
@@ -166,10 +168,21 @@ if __name__ == "__main__":
             filter = filter
         )
         if filter in ["115W", "150W", "200W"]:
-            process_band(cfg, stage1 = True, stage2=True, stage3 = True, sky_var=True, resample = True, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.02, output_shape=[18000, 9000]) # [16000, 7000]
+
+            if filter == "115W" and int(pointing) in [5,7,8,9]:
+                shape = [18000, 9000]
+
+            else:
+                shape = [16000, 7000]
+ 
+            process_band(cfg, stage1 = False, stage2=False, stage3 = False, sky_var=False, resample = True, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.02, output_shape=shape) # [16000, 7000]
     
         else:
-            process_band(cfg, stage1 = True, stage2=True, stage3 = True, sky_var=True, resample = True, bkgsub = True, drizzle_pixfrac=0.75, drizzle_pixscl=0.04,output_shape= [9000, 5000])  #[8000, 3500]
+            if filter  == "356W" and int(pointing) in [5,7,8,9]:
+                shape = [9000, 5000]
+            else: 
+                shape = [8000, 3500]
+            process_band(cfg, stage1 = False, stage2=False, stage3 = False, sky_var=False, resample = True, bkgsub = True, drizzle_pixfrac=0.75, drizzle_pixscl=0.04,output_shape= shape)  #[8000, 3500]
 
 
 
