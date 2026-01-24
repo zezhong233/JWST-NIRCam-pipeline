@@ -1,2 +1,6 @@
 ./json
 ./data
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
