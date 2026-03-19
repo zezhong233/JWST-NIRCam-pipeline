@@ -134,28 +134,11 @@ class pipeline():
         #fill nan place to 0, seems stripping step needs it.
         if stripping:
             
-            with fits.open(rate, mode = "update") as hdul:#update is important.
-                sci = hdul["SCI"].data
-                sci[np.where(np.isnan(sci))] = 0
-                hdul["SCI"].data = sci
-                hdul.flush()
-                
             print("--Start to do 1/f noise subtration for {0}--".format(rate))
             sn = striping_noise(INPUTDIR=self.stage1_dir, OUTPUTDIR=self.stage1_dir, MASKTHRESH=MASKTHRESH) #for bcg field, 0 is recommend. for other condition, 0.8 is better.
-            sn.measure_striping(rate, pre_1f_name, save_patterns = False, apply_flat = True)
+            sn.measure_striping(rate, pre_1f_name, save_patterns = True, apply_flat = True)
             print("--Finish 1/f noise subtraction for {0}_rate.fits--".format(base_index))
-            
-            with fits.open(rate, mode = "update") as hdul:#update is important.
-                sci = hdul["SCI"].data
-                sci[sci == 0] = np.nan
-                hdul["SCI"].data = sci
-                hdul.flush()    
-
-            with fits.open(pre_1f_name, mode = "update") as hdul:#update is important.
-                sci = hdul["SCI"].data
-                sci[sci == 0] = np.nan
-                hdul["SCI"].data = sci
-                hdul.flush()        
+               
 
 
     def stage2(self, ratefile, stage2 = True, wisp = True):
@@ -223,7 +206,7 @@ class pipeline():
             TweakRegStep.call(json_t, save_results = True, 
                     #source detection
                     use_custom_catalogs = use_custom_catalogs, catfile = rel_catfile_dir,enforce_user_order = False, 
-                    kernel_fwhm = 1.5, bkg_boxsize = 100, snr_threshold = 2.5,
+                    kernel_fwhm = 3, bkg_boxsize = 100, snr_threshold = 2.5,
                     #relative alignment
                     minobj = 20, searchrad = 1.0, separation = 0.2, tolerance = 0.1, nclip = 1, sigma = 0.6, fitgeometry = "rshift",
                     #absolute alignment 
