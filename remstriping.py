@@ -441,11 +441,12 @@ class striping_noise():
         with ImageModel(image) as immodel:
             sci = immodel.data
             # to replace zeros
-            wzero = np.where(sci == 0)
+            # wzero = np.where(sci == 0)
+
             temp_sci = sci - horizontal_striping
             # transpose back
             outsci = temp_sci - vertical_striping
-            outsci[wzero] = 0
+            # outsci[wzero] = 0
             # replace NaNs with zeros and update DQ array
             # the image has NaNs where an entire row/column has been masked out
             # so no median could be calculated.
@@ -457,7 +458,7 @@ class striping_noise():
     #        outsci[np.where(wref)] = 0
             wnan = np.isnan(outsci)
             bpflag = dqflags.pixel['DO_NOT_USE']
-            outsci[wnan] = 0
+            # outsci[wnan] = 0
             immodel.dq[wnan] = np.bitwise_or(immodel.dq[wnan], bpflag)
 
             # write output
