@@ -35,7 +35,8 @@ def run_stage2(arg):
 def run_stage3(cfg):
 
     pl = pipeline(**cfg)
-    abs_refcat = "/Data/BLAGN_legacy/CEERS_EGS_HST_v1.9_cat_radecmag.ecsv" 
+    # abs_refcat = "/Data/BLAGN_legacy/CEERS_EGS_HST_v1.9_cat_radecmag.ecsv" 
+    abs_refcat = None
     pl.stage3_part1(use_custom_catalogs=False, abs_refcat = abs_refcat, 
                     update_wcs = True, skymatch = True, outlier_detection = True,  sky_wcs_var = False) #先只做前三步
 
@@ -141,13 +142,13 @@ def process_band(cfg, stage1 = False, stage2 = False, stage3 = False, sky_var = 
 
 if __name__ == "__main__":
 
-    pointing = "9"
-    filters = ["444W"]
+    filters = ["277W"]
     # filters = ["150W"]
 
     wisp_dir = "/home/zhongyi/CRDS/wisp_template_ver3"
     for filter in filters:
-        sci_dir = f"/RS2423/JWST/BLAGN_legacy/CEERS_PID_1345_NIRCam/Pointing_{pointing}/F{filter}"
+        # sci_dir = f"/RS2423/JWST/BLAGN_legacy/CEERS_PID_1345_NIRCam/Pointing_{pointing}/F{filter}"
+        sci_dir = "/RS2423/JWST/BLAGN_legacy/PRIMER_PID_1837_NIRCam/example/F277W"
         stage0_dir = os.path.join(sci_dir, "uncal") 
         stage1_dir = os.path.join(sci_dir, "stage1")
         stage2_dir = os.path.join(sci_dir, "stage2")
@@ -167,43 +168,6 @@ if __name__ == "__main__":
             mosaic_dir = mosaic_dir,
             filter = filter
         )
-        if filter in ["115W", "150W", "200W"]:
 
-            if filter == "115W" and int(pointing) in [5,7,8,9]:
-                shape = [18000, 9000]
-
-            else:
-                shape = [16000, 7000]
- 
-            process_band(cfg, stage1 = False, stage2=False, stage3 = False, sky_var=False, resample = True, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.02, output_shape=shape) # [16000, 7000]
-    
-        else:
-            if filter  == "356W" and int(pointing) in [5,7,8,9]:
-                shape = [9000, 5000]
-            else: 
-                shape = [8000, 3500]
-            process_band(cfg, stage1 = False, stage2=False, stage3 = False, sky_var=False, resample = True, bkgsub = True, drizzle_pixfrac=0.75, drizzle_pixscl=0.04,output_shape= shape)  #[8000, 3500]
-
-
-
-
-        # if filter in ["115W", "150W", "200W"]:
-        #     if filter == "150W":
-        #         process_band(cfg, stage1 = False, stage2=False, stage3 = False, sky_var=False, resample = False, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.02, output_shape=[18000, 9000]) # [16000, 7000]
-        #     else:
-        #         process_band(cfg, stage1 = True, stage2=True, stage3 = True, sky_var=True, resample = True, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.02, output_shape=[18000, 9000]) # [16000, 7000]
-        # else:
-        #     process_band(cfg, stage1 = True, stage2=True, stage3 = True, sky_var=True, resample = True, bkgsub = True, drizzle_pixfrac=0.75, drizzle_pixscl=0.04,output_shape= [9000, 5000])  #[8000, 3500]
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # shape = [8000, 4000]
+        process_band(cfg, stage1 = True, stage2=True, stage3 = True, sky_var=True, resample = True, bkgsub = True , drizzle_pixfrac=0.75, drizzle_pixscl=0.04, output_shape=None) 
