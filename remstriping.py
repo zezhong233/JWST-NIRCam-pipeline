@@ -29,6 +29,8 @@ from scipy.optimize import curve_fit
 from scipy.ndimage import binary_dilation
 from scipy.ndimage import median_filter
 from make_source_mask import make_source_mask
+from mine_utils import show_image 
+import matplotlib.pyplot as plt
 
 
 # jwst-related imports
@@ -124,13 +126,17 @@ class striping_noise():
             res = astrostats.sigma_clipped_stats(im, mask=mask, sigma=sig, 
                                                 cenfunc='median',
                                                 stdfunc='std', axis=1)
+            
         elif dimension == 'x':
     #        collapsed = np.median(im, axis=0)
             res = astrostats.sigma_clipped_stats(im, mask=mask, sigma=sig, 
                                                 cenfunc='median',
                                                 stdfunc='std', axis=0)
-
-        return res[1]
+        result = res[1]
+        nan_pos = np.where(np.isnan(result))
+        result[nan_pos] = 0 ## replace the nan as 0.
+        
+        return result
         
     def masksources(self, image):
         """Detect sources in an image using a tiered approach for different 
@@ -173,10 +179,8 @@ class striping_noise():
         temp = np.zeros(sci.shape)
         temp[mask1] = 1
         sources = np.logical_not(temp == 0)
-        dilation_sigma = 10
-        dilation_window = 20
-        # dilation_sigma = 20
-        # dilation_window = 40
+        dilation_sigma = 5
+        dilation_window = 10
         print(f"dilation_sigma = {dilation_sigma}, dilation_window = {dilation_window}")
         dilation_kernel = Gaussian2DKernel(dilation_sigma, x_size=dilation_window,
                                         y_size=dilation_window)
@@ -232,13 +236,19 @@ class striping_noise():
 
         # fit horizontal striping, collapsing along columns
         horizontal_striping = self.collapse_image(fitdata, mask, dimension='y')
+        # print("shape", horizontal_striping.shape)
+        # print(f'aaahorizontal_striping, {np.nanmedian(horizontal_striping)}')
         # remove horizontal striping, requires taking transpose of image
         temp_image = fitdata.T - horizontal_striping
+        
+        # print(f'temp_image, {np.isnan(temp_image).any()}') 
+
         # transpose back
         temp_image2 = temp_image.T
 
         # fit vertical striping, collapsing along rows
-        vertical_striping = self.collapse_image(temp_image2, mask, dimension='x')
+        vertical_striping = self.collapse_image(temp_image2, mask, dimension='x') ## question
+
 
         return horizontal_striping, vertical_striping
 
@@ -294,6 +304,9 @@ class striping_noise():
         outputbase = os.path.join(self.OUTPUTDIR, os.path.basename(image))
 
         model = ImageModel(image)
+        # print(f"hahahahahahahah before, {np.isnan(model.data).any()}")
+
+
         log.info('Measuring image striping')
         log.info('Working on %s'%os.path.basename(image))
 
@@ -320,10 +333,12 @@ class striping_noise():
             log.info('Using flat: %s'%(os.path.basename(flatfile)))
             with FlatModel(flatfile) as flat:
                 # use the JWST Calibration Pipeline flat fielding Step 
+                # print("hahahahahahahah", flat)
                 model,applied_flat = do_correction(model, flat)
                 
         # construct mask for median calculation
         mask = np.zeros(model.data.shape, dtype=bool)
+        # print(f"hahahahahahahah after, {np.isnan(model.data).any()}")
         mask[model.dq > 4] = True
         # mask |= (model.data == 0)
         # mask |= np.isnan(model.data)
@@ -345,12 +360,14 @@ class striping_noise():
             
             wobj = np.where(seg > 0)
             mask[wobj] = True
+            mask |= np.isnan(model.data)
             
 
         # measure the pedestal in the unmasked parts of the image
         log.info('Measuring the pedestal in the image')
         pedestal_data = model.data[~mask]
         pedestal_data = pedestal_data.flatten()
+        print(f"hahahahah, pedestal_data is {pedestal_data}")
         median_image = np.median(pedestal_data)
         log.info('Image median (unmasked and DQ==0): %f'%(median_image))
         try:
@@ -366,7 +383,7 @@ class striping_noise():
 
         # measure full pattern across image
         full_horizontal, vertical_striping = self.measure_fullimage_striping(model.data, 
-                                                                        mask)
+                                                                        mask) ## 1-d array. vertical_striping pattern is not used here.
 
         horizontal_striping = np.zeros(model.data.shape)
         vertical_striping = np.zeros(model.data.shape)
@@ -386,7 +403,7 @@ class striping_noise():
             for i,row in enumerate(ampmask):
                 if nmask[i] > (ampmask.shape[1]*thresh):
                     # use median from full row
-                    horizontal_striping[i,colstart:colstop] = full_horizontal[i]
+                    horizontal_striping[i,colstart:colstop] = full_horizontal[i] ## size of rows is same for full_horizontal and hsstriping_amp
                     ampcount += 1
                 else:
                     # use the amp fit 
@@ -401,8 +418,11 @@ class striping_noise():
         temp_sub = model.data - horizontal_striping
 
         # fit vertical striping, collapsing along rows
-        vstriping = self.collapse_image(temp_sub, mask, dimension='x')
+        vstriping = self.collapse_image(temp_sub, mask, dimension='x') ## question ## 1d
+
         vertical_striping[:,:] = vstriping
+        print(vertical_striping.shape)
+
 
         # save horizontal and vertical patterns                    
         if save_patterns:
